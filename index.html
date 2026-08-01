@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RYTHMIC</title>
+  <!-- Inline SVG favicon. Browsers request /favicon.ico unprompted; without
+       this the server logs a 404 on every single page load. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2307070d'/%3E%3Ccircle cx='12' cy='22' r='5' fill='%235ef2ff'/%3E%3Crect x='16' y='6' width='2.6' height='17' fill='%235ef2ff'/%3E%3Cpath d='M18.6 6h7v3.4h-7z' fill='%23ff4d6d'/%3E%3C/svg%3E" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #07070d;
+      overflow: hidden;
+      font-family: 'Rajdhani', 'Trebuchet MS', 'Segoe UI', sans-serif;
+    }
+    /* DESIGN.md §4 — local font faces (OFL). No runtime network dependency. */
+    @font-face { font-family: 'Orbitron'; src: url('./fonts/orbitron-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+    @font-face { font-family: 'Orbitron'; src: url('./fonts/orbitron-latin-700-normal.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+    @font-face { font-family: 'Orbitron'; src: url('./fonts/orbitron-latin-900-normal.woff2') format('woff2'); font-weight: 900; font-display: swap; }
+    @font-face { font-family: 'Rajdhani'; src: url('./fonts/rajdhani-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+    @font-face { font-family: 'Rajdhani'; src: url('./fonts/rajdhani-latin-600-normal.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+    @font-face { font-family: 'Rajdhani'; src: url('./fonts/rajdhani-latin-700-normal.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+    @font-face { font-family: 'Monoton'; src: url('./fonts/monoton-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+    #game {
+      width: 100vw; height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+    }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <div id="game"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
