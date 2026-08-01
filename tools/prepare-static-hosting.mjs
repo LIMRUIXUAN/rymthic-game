@@ -1,9 +1,10 @@
 import { execFileSync } from 'node:child_process';
-import { readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const dist = path.resolve('dist');
-const assets = path.join(dist, 'assets');
+const client = path.join(dist, 'client');
+const assets = path.join(client, 'assets');
 
 async function filesIn(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -30,7 +31,20 @@ for (const file of outputFiles.filter((file) => file.endsWith('.mp3'))) {
   await rename(temp, file);
 }
 
-for (const file of (await filesIn(dist)).filter((file) => file.endsWith('.js'))) {
+for (const file of (await filesIn(client)).filter((file) => file.endsWith('.js'))) {
   const contents = await readFile(file, 'utf8');
   await writeFile(file, contents.replaceAll('.png', '.webp'));
 }
+
+await mkdir(path.join(dist, 'server'), { recursive: true });
+await writeFile(path.join(dist, 'server', 'index.js'), `export default {
+  async fetch(request, env) {
+    const response = await env.ASSETS.fetch(request);
+    if (response.status !== 404) return response;
+
+    const url = new URL(request.url);
+    if (url.pathname.includes('.')) return response;
+    return env.ASSETS.fetch(new Request(new URL('/index.html', url), request));
+  },
+};
+`);
