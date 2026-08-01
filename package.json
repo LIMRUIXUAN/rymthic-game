@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node tools/prepare-static-hosting.mjs",
     "preview": "vite preview",
     "balance": "python3 tools/balance_sim.py",
     "test": "node tests/combat.test.js",
