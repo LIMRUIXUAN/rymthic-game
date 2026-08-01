@@ -172,7 +172,7 @@ const { BallHop } = await import('../src/minigames/BallHop.js');
 const { VISIBLE_BEATS, JAM_REVEAL_BEATS } = await import('../src/minigames/MiniGame.js');
 const { OsuCircles } = await import('../src/minigames/OsuCircles.js');
 const { RunState } = await import('../src/core/RunState.js');
-const { makeEnemy } = await import('../src/data/enemies.js');
+const { makeEnemy, enemySkillsFor } = await import('../src/data/enemies.js');
 const { generateChart, LANES, TILE_KINDS } = await import('../src/core/ChartGen.js');
 const { JUDGMENTS } = await import('../src/core/Judge.js');
 
@@ -409,6 +409,41 @@ test('OsuCircles keeps motion paths inside one phrase', () => {
   assert.strictEqual(mg.pathAnchor, undefined,
     'attack should begin without a red-to-green connector');
   mg.destroy();
+});
+
+test('OsuCircles adds sparse sliders, reverse paths, spinners, and target focus', () => {
+  const conductor = fakeConductor();
+  const scene = makeScene();
+  const mg = new OsuCircles(scene, BOUNDS, conductor, { level: 14 });
+  mg.create();
+  const phrase = generateChart(14).phrases[0];
+  mg.startPhrase(phrase);
+  conductor.beat = phrase.startBeat;
+  mg.update();
+
+  const sliders = mg.notes.filter((n) => n.objectType === 'slider');
+  const reverse = sliders.find((n) => n.reverseSlider);
+  const spinner = mg.notes.find((n) => n.objectType === 'spinner');
+  assert.ok(sliders.length >= 2, 'Osu should seed more than one slider in a phrase');
+  assert.ok(sliders.every((n) => n.sliderTicks.length >= 4 && n.sliderPath.length === 3),
+    'sliders need a curved path and tick checkpoints');
+  assert.ok(sliders.every((n) => n.sliderBaseDuration >= 0.38),
+    'slider travel should leave enough time to follow the path');
+  assert.ok(reverse?.sliderRepeats === 2, 'one slider should reverse back along its path');
+  assert.ok(spinner?.spinnerRequiredSpin > 0, 'spinner should expose a spin requirement');
+  assert.ok(mg.nextTarget, 'the next visible object should be highlighted');
+
+  mg.setHidden(conductor.beat + 4);
+  mg.setFlashlight(conductor.beat + 4);
+  assert.ok(mg.isHidden, 'Hidden should be active for the Osu phrase');
+  assert.ok(mg.isFlashlight, 'Flashlight should be active for the Osu phrase');
+  mg.destroy();
+});
+
+test('Osu enemy skills expose Hidden and Flashlight at the Osu levels', () => {
+  const skills = new Set([...enemySkillsFor(13), ...enemySkillsFor(18)].map((s) => s.id));
+  assert.ok(skills.has('flashlight'), 'Osu skill pool should include Flashlight');
+  assert.ok(skills.has('hidden'), 'Osu skill pool should include Hidden');
 });
 
 test('a player who does nothing misses everything (and nothing crashes)', () => {

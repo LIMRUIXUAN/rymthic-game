@@ -393,6 +393,35 @@ input. Accuracy = ring-overlap precision.
 - Stacked circles for burst archetypes
 - On defense phrases the circles are **red** and represent incoming hits
 
+#### Osu object rules implemented in the prototype
+
+The Osu route keeps the movement-only input contract, but now uses a sparse,
+deterministic mix of standard hit objects so the player can read what is coming:
+
+| Object | Presentation | Success condition | Failure condition |
+|---|---|---|---|
+| **Circle** | Numbered target with an approach ring | Cursor is inside the target during the timing window | Target is passed without a movement hit |
+| **Slider** | Curved two-segment path, tick markers, and a follow ball | Enter the head on time, then stay near each tick | Head is missed or fewer than 30% of ticks are followed |
+| **Reverse slider** | Slider with a return arrow and a second path traversal | Follow both passes and their ticks | Same as slider, evaluated across both passes |
+| **Spinner** | Enlarged target plus an escape-style progress meter | Move around the target until the spin meter fills | Meter remains below 40% at the end of the spin window |
+
+The generator selects a spinner every 13th object and a slider every 6th object
+at levels 11 and above. Reverse sliders are a subset of the slider cadence.
+Because the selection is deterministic, a chart can be rehearsed and tested
+without introducing random duplicates or cross-phrase connector lines.
+
+The next unresolved visible object receives a soft white focus ring. The ring is
+an affordance only; it never changes hit timing or judgment values. Hidden and
+Flashlight are Osu-only enemy skills:
+
+- **Hidden** removes approach rings and keeps each circle unreadable until it is
+  close to its hit window.
+- **Flashlight** limits the readable playfield to a cursor-centred radius and
+  hides targets and path segments outside that radius.
+
+Both effects are time-limited by the enemy skill duration and reset at the end
+of each phrase, so a level never leaves the player permanently blind.
+
 ### Difficulty ramp inside a minigame
 
 `setSpeedTier` is what `Hurry` calls. Tier raises scroll speed, note density, and shrinks judgment windows — it does **not** change BPM (the song stays the same, which keeps the audio sync intact).

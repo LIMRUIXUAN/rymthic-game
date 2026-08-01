@@ -10,7 +10,9 @@
 import { SKILLS } from '../data/skills.js';
 import { PETS } from '../data/pets.js';
 
-const ENEMY_SKILL_IDS = ['jam', 'mirror', 'accelerando', 'shield', 'mend', 'curse'];
+const ENEMY_SKILL_IDS = [
+  'jam', 'mirror', 'accelerando', 'shield', 'mend', 'curse', 'hidden', 'flashlight',
+];
 const ENEMY_COUNT = 20;
 
 export const ASSETS = [

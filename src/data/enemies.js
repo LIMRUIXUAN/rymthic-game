@@ -33,13 +33,19 @@ const SKILL_POOL = [
   { id: 'curse',        name: 'Curse',        desc: 'Your next skill costs double' },
 ];
 
+const OSU_SKILL_POOL = [
+  { id: 'hidden',        name: 'Hidden',       desc: 'Approach rings vanish and circles fade in late' },
+  { id: 'flashlight',   name: 'Flashlight',   desc: 'Only targets near the cursor remain visible' },
+];
+
 export function enemySkillsFor(level) {
   if (level < 3) return [];
+  const pool = level >= 11 ? [...SKILL_POOL, ...OSU_SKILL_POOL] : SKILL_POOL;
   const out = [];
   const count = level >= 12 ? 2 : 1;
   for (let i = 0; i < count; i++) {
-    const idx = (level * 3 + i * 5) % SKILL_POOL.length;
-    out.push(SKILL_POOL[idx]);
+    const idx = (level * 3 + i * 5) % pool.length;
+    out.push(pool[idx]);
   }
   return out;
 }

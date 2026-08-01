@@ -349,6 +349,18 @@ export class LevelScene extends Phaser.Scene {
         this.minigame.setMirror(true);
         this.floatText('LANES MIRRORED', 0xa78bfa);
         break;
+      case 'hidden':
+        // Osu's Hidden keeps the hit object readable only near its timing
+        // point, while removing the approach-circle forecast.
+        this.minigame.setHidden?.(this.conductor.beat + 8);
+        this.floatText('HIDDEN OBJECTS', 0xa78bfa);
+        break;
+      case 'flashlight':
+        // Flashlight is a cursor-centred visibility cone. It is movement-only,
+        // so it never asks the player to press a button.
+        this.minigame.setFlashlight?.(this.conductor.beat + 8);
+        this.floatText('FLASHLIGHT', 0x5ef2ff);
+        break;
       default: break;
     }
     this.topHud.refresh();

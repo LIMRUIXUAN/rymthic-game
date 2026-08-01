@@ -10,7 +10,7 @@
     "balance": "python3 tools/balance_sim.py",
     "test": "node tests/combat.test.js",
     "test:scene": "node tests/scene.test.mjs",
-    "test:browser": "vite build && node tests/smoke.mjs dist"
+    "test:browser": "vite build && node tests/smoke.mjs dist/client"
   },
   "dependencies": {
     "phaser": "^4.2.1"
