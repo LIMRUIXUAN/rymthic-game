@@ -12,8 +12,7 @@ const DEFAULT = {
     bestAccuracy: 0, clears: 0,
   },
   settings: {
-    audioOffsetMs: 0, musicVol: 0.6, sfxVol: 0.42,
-    calibrated: false, keybinds: true,
+    musicVol: 0.6, sfxVol: 0.42, keybinds: true,
   },
   run: null,
 };

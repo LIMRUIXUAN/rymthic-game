@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene.js';
-import { CalibrationScene } from './scenes/CalibrationScene.js';
 import { MenuScene } from './scenes/MenuScene.js';
+import { PracticeScene } from './scenes/PracticeScene.js';
 import { LevelScene } from './scenes/LevelScene.js';
 import { UpgradeScene } from './scenes/UpgradeScene.js';
 import { GameOverScene } from './scenes/GameOverScene.js';
@@ -23,7 +23,7 @@ const config = {
   // No arcade/matter physics: every position in this game is derived from the
   // beat clock, not from simulated motion. Adding a physics step would only
   // introduce a second, competing source of truth about where things are.
-  scene: [BootScene, CalibrationScene, MenuScene, UpgradeScene, LevelScene, GameOverScene],
+  scene: [BootScene, MenuScene, PracticeScene, UpgradeScene, LevelScene, GameOverScene],
 };
 
 const game = new Phaser.Game(config);

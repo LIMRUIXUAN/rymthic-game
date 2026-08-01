@@ -172,11 +172,8 @@ export class OsuCircles extends MiniGame {
     return this.conductor.beat < this.flashlightUntilBeat;
   }
 
-  /** Deterministic special-object cadence, sparse enough to read musically. */
-  objectTypeFor(sequenceIndex) {
-    if (this.level < 11) return 'circle';
-    if (sequenceIndex % 13 === 7) return 'spinner';
-    if (sequenceIndex % 6 === 2) return 'slider';
+  /** Osu stays on the readable basic target for every level. */
+  objectTypeFor() {
     return 'circle';
   }
 
@@ -195,11 +192,13 @@ export class OsuCircles extends MiniGame {
     const mid = { x: (note.x + end.x) / 2 - (dy / length) * bend,
       y: (note.y + end.y) / 2 + (dx / length) * bend };
     note.objectType = 'slider';
-    note.reverseSlider = note.sequence % 12 === 8;
+    // Keep sliders one-way. Reverse sliders required the player to turn back
+    // along the path immediately, which was too demanding with mouse movement.
+    note.reverseSlider = false;
     note.sliderPath = [{ x: note.x, y: note.y }, mid, end];
     note.sliderBaseDuration = Phaser.Math.Clamp(gap * SLIDER_DURATION_SCALE,
       SLIDER_MIN_DURATION, SLIDER_MAX_DURATION);
-    note.sliderRepeats = note.reverseSlider ? 2 : 1;
+    note.sliderRepeats = 1;
     note.sliderEndBeat = note.absBeat + note.sliderBaseDuration * note.sliderRepeats;
     note.sliderTicks = Array.from({ length: SLIDER_TICKS * note.sliderRepeats }, (_, i) => ({
       beat: note.absBeat + note.sliderBaseDuration * ((i + 1) / SLIDER_TICKS),
@@ -376,12 +375,6 @@ export class OsuCircles extends MiniGame {
       g.lineStyle(2, tick.checked && tick.hit ? 0xffffff : note.color,
         tick.checked && tick.hit ? 0.9 : 0.52);
       g.strokeCircle(p.x, p.y, 5);
-    }
-    if (note.reverseSlider) {
-      const p = this.pathAt(note, 1);
-      g.lineStyle(2.5, 0xffffff, 0.85);
-      g.lineBetween(p.x - 8, p.y - 7, p.x + 1, p.y);
-      g.lineBetween(p.x + 1, p.y, p.x - 8, p.y + 7);
     }
     if (note.sliderStarted) {
       const p = this.pathAt(note, this.sliderPathProgress(note, beat));

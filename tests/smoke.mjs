@@ -1,6 +1,6 @@
 /**
  * Browser smoke test. Boots the real built game in headless Chrome, clicks
- * through Boot -> Calibration -> Menu -> Upgrade -> Level, and fails on ANY
+ * through Boot -> Menu -> Upgrade -> Level, and fails on ANY
  * console error or uncaught exception.
  *
  * A passing `vite build` only proves the code parses. It says nothing about
@@ -161,16 +161,9 @@ await step('Boot scene is active', async () => {
   if (!s.includes('Boot')) throw new Error(`expected Boot, got ${s.join(',')}`);
 });
 
-await step('click-to-begin advances to Calibration', async () => {
+await step('click-to-begin advances to Menu', async () => {
   await click(720, 455);
   await new Promise((r) => setTimeout(r, 900));
-  const s = await activeScenes();
-  if (!s.includes('Calibration')) throw new Error(`expected Calibration, got ${s.join(',')}`);
-});
-
-await step('calibration skip reaches Menu', async () => {
-  await click(720, 750);            // "skip" button
-  await new Promise((r) => setTimeout(r, 1800));
   const s = await activeScenes();
   if (!s.includes('Menu')) throw new Error(`expected Menu, got ${s.join(',')}`);
 });

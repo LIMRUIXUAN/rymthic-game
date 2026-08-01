@@ -9,15 +9,13 @@
  * We read AudioContext.currentTime, which is the same hardware clock that is actually
  * pushing samples to the speakers. It cannot drift relative to the music.
  *
- * Three separate offsets, deliberately not merged:
- *   userOffsetMs   - from calibration; corrects the player's hardware + reaction bias
+ * Two separate offsets, deliberately not merged:
  *   chartOffsetMs  - per-song lead-in correction
  *   outputLatency  - what the browser reports about its own buffer delay
  */
 export class Conductor {
   constructor(music) {
     this.music = music;
-    this.userOffsetMs = 0;
     this.chartOffsetMs = 0;
     this.useReportedLatency = true;
 
@@ -34,7 +32,7 @@ export class Conductor {
   /** Total correction applied to raw audio position, in milliseconds. */
   get totalOffsetMs() {
     const latency = this.useReportedLatency ? this.music.outputLatency * 1000 : 0;
-    return this.userOffsetMs + this.chartOffsetMs + latency;
+    return this.chartOffsetMs + latency;
   }
 
   /** Where the song actually is, in milliseconds, corrected. */

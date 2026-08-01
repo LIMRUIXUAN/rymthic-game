@@ -7,7 +7,7 @@
  * whole balance table becomes fiction.
  */
 import assert from 'node:assert';
-import { RunState, DIFF_ATK, DIFF_RISK } from '../src/core/RunState.js';
+import { RunState, DIFF_ATK, DIFF_RISK, stageDamageMultiplier } from '../src/core/RunState.js';
 import { CombatResolver, K_OUT, K_IN } from '../src/core/CombatResolver.js';
 import { SkillEngine } from '../src/core/SkillEngine.js';
 import { judge, JUDGMENTS, windowScale } from '../src/core/Judge.js';
@@ -50,6 +50,7 @@ test('outgoing damage matches the design formula', () => {
   Object.defineProperty(run, 'petMult', { get: () => 1.15 });
 
   const expected = run.atk * K_OUT * 1.0 * 2.5 * 1.15 * DIFF_ATK[1]
+    * stageDamageMultiplier(10)
     * (1 - enemy.def / (enemy.def + 100));
   const before = enemy.hp;
   combat.resolveHeroNote(JUDGMENTS.PERFECT);
@@ -62,7 +63,8 @@ test('incoming damage matches the design formula', () => {
   const skills = new SkillEngine(run, { beat: 0 });
   const combat = new CombatResolver(run, enemy, skills, { beat: 0 });
 
-  const expected = enemy.atk * K_IN * DIFF_RISK[1] * (1 - run.defReduction);
+  const expected = enemy.atk * K_IN * DIFF_RISK[1] * stageDamageMultiplier(10)
+    * (1 - run.defReduction);
   run.missShieldUsed = true; // C9: the phrase's first miss is absorbed
   const before = run.hp;
   combat.resolveEnemyNote(JUDGMENTS.MISS);
@@ -76,6 +78,23 @@ test('blocked notes deal no damage', () => {
   const before = run.hp;
   combat.resolveEnemyNote(JUDGMENTS.PERFECT);
   assert.strictEqual(run.hp, before);
+});
+
+test('stages after 8 scale both damage directions with one transition grace hit', () => {
+  assert.strictEqual(stageDamageMultiplier(8), 1);
+  assert.ok(stageDamageMultiplier(9) > 1);
+  assert.ok(stageDamageMultiplier(20) > stageDamageMultiplier(9));
+
+  const run = evenBuild(9);
+  const enemy = makeEnemy(9);
+  const combat = new CombatResolver(run, enemy, new SkillEngine(run, {}), {});
+  run.missShieldUsed = true;
+  run.hp = 1;
+  combat.resolveEnemyNote(JUDGMENTS.MISS);
+  assert.strictEqual(run.hp, 1, 'the transition grace hit should prevent immediate death');
+  assert.strictEqual(run.postStage8GraceUsed, true);
+  combat.resolveEnemyNote(JUDGMENTS.MISS);
+  assert.strictEqual(run.hp, 0, 'later damage should still be able to kill normally');
 });
 
 console.log('\n── C9 soft-punishment buffer ───────────────────');
@@ -565,6 +584,17 @@ test('spending an HP point grants the HP, not just the ceiling', () => {
   assert.strictEqual(run.hp, hpBefore + 12, 'current HP should rise too');
 });
 
+test('Attack points roll a persistent +2 or +3 gain', () => {
+  const run = evenBuild(1);
+  run.unspentPoints = 1;
+  const before = run.atk;
+  assert.ok(run.spendPoint('atk'));
+  assert.ok([2, 3].includes(run.atk - before), `attack gain should be +2 or +3, got ${run.atk - before}`);
+
+  const restored = RunState.deserialize(run.serialize());
+  assert.strictEqual(restored.atk, run.atk, 'attack rolls must survive serialization');
+});
+
 test('combo multiplier caps at 4x', () => {
   const run = evenBuild(10);
   run.combo = 100000;
@@ -630,7 +660,7 @@ test('a 90% player clears normal levels but is pressured by bosses', () => {
   }
 });
 
-test('80% accuracy fails in the late game — the fail line is real', () => {
+test('80% accuracy remains dangerous in the late game', () => {
   const late = simulateLevel(19, 0.80);
   const final = simulateLevel(20, 0.80);
   assert.ok(!final.heroAlive,

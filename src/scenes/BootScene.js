@@ -98,7 +98,7 @@ export class BootScene extends Phaser.Scene {
         // point. MenuScene keeps the same track playing (playMenuBgm no-ops
         // when a track is already running).
         playMenuBgm(this);
-        this.scene.start(saveManager.settings.calibrated ? 'Menu' : 'Calibration');
+        this.scene.start('Menu');
       },
     });
 

@@ -57,10 +57,6 @@ export class MusicEngine {
     this._noiseBuffer = null;
 
     this.song = null;
-    // Calibration clicks scheduled on the audio clock, tracked so they can be
-    // cancelled (cancelClicks) — otherwise a re-entered calibration screen
-    // layers new clicks on top of the old ones still waiting to fire.
-    this._clicks = new Set();
     this.musicVolume = 0.6;
     // GAME_PLAN A1: 0..4. Each layer of combo adds instruments to the
     // arrangement, so a clean streak literally builds the track.
@@ -398,55 +394,6 @@ export class MusicEngine {
         this._blip(180, 96, 0.16, 'sine', 0.12);
         break;
     }
-  }
-
-  /**
-   * Schedule a metronome click at an EXACT audio-clock time.
-   *
-   * The calibration screen must use this rather than sfx('metronome') from the
-   * frame loop. A frame-timed click carries up to a full frame of jitter (~16ms
-   * at 60fps, worse under load), and that jitter lands directly in the offset
-   * measurement — the tool meant to remove latency would be adding its own.
-   *
-   * Clicks route to the master bus, NOT the sfx bus: calibration is a system
-   * measurement, so it must stay audible no matter what effect volume the
-   * player configured. Every scheduled click is tracked and can be silenced
-   * early with cancelClicks() — call it when leaving the calibration screen,
-   * otherwise the remaining clicks keep firing over the next scene.
-   *
-   * @param atTime exact audio-clock time (music.currentTime) to sound the click
-   * @param gain   peak gain; 0.3 is clearly audible at master volume
-   */
-  scheduleClick(atTime, gain = 0.3) {
-    if (!this.ctx) return;
-    const o = this.ctx.createOscillator();
-    const lp = this.ctx.createBiquadFilter();
-    const g = this.ctx.createGain();
-    o.type = 'triangle';                 // softer than square, still crisp
-    o.frequency.setValueAtTime(1200, atTime);
-    lp.type = 'lowpass';
-    lp.frequency.value = 4000;
-    g.gain.setValueAtTime(0.0001, atTime);
-    g.gain.exponentialRampToValueAtTime(gain, atTime + 0.004);
-    g.gain.exponentialRampToValueAtTime(0.0001, atTime + 0.05);
-    o.connect(lp); lp.connect(g); g.connect(this.master);
-    this._clicks.add(o);
-    o.onended = () => this._clicks.delete(o);
-    o.start(atTime); o.stop(atTime + 0.06);
-  }
-
-  /**
-   * Immediately silence every click scheduled by scheduleClick(), including
-   * ones whose start time is still in the future. Safe to call any time; nodes
-   * that already finished are simply skipped. Used by the calibration screen
-   * on entry (defensive) and on exit (so the metronome does not keep playing
-   * over the Menu).
-   */
-  cancelClicks() {
-    this._clicks.forEach((o) => {
-      try { o.stop(); } catch { /* already stopped or not started — fine */ }
-    });
-    this._clicks.clear();
   }
 
   sfx(name) {

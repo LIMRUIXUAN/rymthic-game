@@ -17,7 +17,7 @@ The enemy sets the tempo. You answer with your mouse. Miss the beat and you blee
 ## 2. The core loop
 
 ```
-Menu → Calibration (once) → LEVEL n
+Menu → LEVEL n
    ├─ Song starts. Enemy and hero alternate PHRASES (8 bars each).
    │    ENEMY PHRASE → enemy sings/attacks → you must hit the notes to BLOCK
    │    HERO PHRASE  → you free-play → accuracy becomes DAMAGE
@@ -123,7 +123,7 @@ The `DEF/(DEF+100)` curve gives diminishing returns, so dumping every point into
 ### 4.5 Mana
 
 ```
-manaGain (per phrase) = 4 + 10 × ACCURACY²
+manaGain (per phrase) = 6 + 14 × ACCURACY²
 ```
 
 Squaring accuracy means sloppy play starves you of skills exactly when you need them. Mana **carries between levels** and only refills 50% on level clear — so spamming skills in level 12 leaves you dry for the level 15 boss. Scarcity is the point.
@@ -135,9 +135,9 @@ Squaring accuracy means sloppy play starves you of skills exactly when you need 
 | Stat | Per point | Base |
 |---|---|---|
 | **HP** | +12 max HP | 100 |
-| **Mana** | +5 max mana, +0.2/s regen | 30 |
+| **Mana** | +10 max mana, +0.2/s regen | 50 |
 | **Defense** | +4 DEF | 0 |
-| **Attack** | +3 ATK | 20 |
+| **Attack** | +2 or +3 ATK (random roll) | 20 |
 
 ---
 
@@ -466,17 +466,16 @@ get songPositionMs() {
   const interp = raw + (performance.now() - this._lastSeekAt);
   // seek() only updates a few times per second; interpolate between updates,
   // hard-resync whenever drift exceeds 20ms
-  return interp - this.userOffsetMs - this.chartOffsetMs;
+  return interp - this.chartOffsetMs;
 }
 get beat() { return this.songPositionMs / (60000 / this.bpm); }
 ```
 
-Three offsets, all separate:
+Two offsets, all separate:
 1. `chartOffsetMs` — baked into the chart file, fixes the song's own lead-in
-2. `userOffsetMs` — from the calibration screen, saved to localStorage
-3. `visualLeadMs` — how early notes spawn so they arrive on time
+2. `visualLeadMs` — how early notes spawn so they arrive on time
 
-**Calibration scene runs before level 1 and is mandatory.** Player clicks along to 8 beats of a metronome; median offset is stored. Skipping this is the #1 reason web rhythm games feel broken.
+Audio calibration is intentionally omitted; the game uses the browser audio clock directly.
 
 Web Audio starts *suspended* until a user gesture. Phaser resumes the context on first interaction, but the Boot scene must gate "Start" behind a real click, and pause the run when the tab loses focus.
 
@@ -486,7 +485,6 @@ Web Audio starts *suspended* until a user gesture. Phaser resumes the context on
 BootScene         → config, load bar assets
 PreloadScene      → assets for the upcoming level only (don't load 20 songs at once)
 MenuScene         → new run / continue / settings
-CalibrationScene  → audio offset (first launch, re-runnable from settings)
 MapScene          → run progress, level 1..20 nodes, current build summary
 LevelScene        → the fight. Owns EnemyPanel / StagePanel / HeroPanel.
 UpgradeScene      → 3 stat points, 2 skill offers, pet events
@@ -564,7 +562,7 @@ Layer on: screen shake scaled to damage, hit-stop (freeze 40ms on big hits), col
 {
   "meta": { "runs": 12, "bestLevel": 14, "shards": 340,
             "unlockedSkills": ["bassdrop"], "unlockedPets": ["echo"] },
-  "settings": { "audioOffsetMs": -32, "musicVol": 0.8, "sfxVol": 1.0, "keybinds": true },
+  "settings": { "musicVol": 0.8, "sfxVol": 1.0, "keybinds": true },
   "run": { "level": 7, "hp": 118, "mana": 42, "seed": 918273,
            "stats": {"hp":2,"mana":1,"def":3,"atk":12},
            "skills": ["respawn_area","respawn_happier","hurry"], "pet": {"id":"metro","lvl":2} }
@@ -701,7 +699,7 @@ A clean streak therefore plays an **ascending melody in key over the backing tra
 
 | Phase | Deliverable | Why this order |
 |---|---|---|
-| **0 — Skeleton** | Vite + Phaser 4 project (`npm i phaser@^4.1`), `Conductor`, CalibrationScene, a metronome that visibly ticks on beat. Set `roundPixels` in config now. | If sync isn't right, nothing else matters. Prove it first. |
+| **0 — Skeleton** | Vite + Phaser 4 project (`npm i phaser@^4.1`), `Conductor`, and a metronome that visibly ticks on beat. Set `roundPixels` in config now. | If sync isn't right, nothing else matters. Prove it first. |
 | **1 — Vertical slice** | Ball Hop + 1 enemy + `CombatResolver` + phrase alternation. Placeholder rectangles, one song. | You can *feel* the core loop at the end of this phase. Play it before building anything else. |
 | **2 — Shell** | Three panels, HP/MP bars, UpgradeScene, stat points, MapScene, levels 1–5 | Turns a fight into a run |
 | **3 — Depth** | SkillEngine + all 24 skills, pets, enemy skills | Where the game becomes replayable |

@@ -4,8 +4,7 @@
  * WHY SEPARATE FROM MusicEngine: battle music is synthesized live by
  * MusicEngine (combo layering, sfx, the Conductor clock). BGM is a plain
  * audio file loop on Phaser's SoundManager, deliberately OFF during combat:
- * the Level scene plays the synth battle track and Calibration runs its
- * audio-clock metronome — layering a file on top of either would be the
+ * the Level scene plays the synth battle track — layering a file on top would be the
  * exact "music stacking" the player complained about.
  *
  * Tracks: Kevin MacLeod (incompetech.com), licensed CC BY 4.0 — attribution
@@ -40,7 +39,7 @@ export function registerBgm(scene) {
 export function playMenuBgm(scene) {
   try {
     if (current && current.sound.isPlaying) {
-      current.sound.setVolume(bgmVolume());
+      setMenuBgmVolume();
       return;
     }
     const pool = BGM_TRACKS.filter((t) => t.key !== lastKey);
@@ -56,9 +55,16 @@ export function playMenuBgm(scene) {
   }
 }
 
+/** Apply the saved MUSIC setting to the track that is already playing. */
+export function setMenuBgmVolume() {
+  if (!current?.sound) return;
+  try { current.sound.setVolume(bgmVolume()); }
+  catch { /* sound may have been destroyed during a scene transition */ }
+}
+
 /**
- * Stop menu BGM. MUST be called when entering the Level or Calibration
- * scenes, which own the audio (battle synth / metronome clicks).
+ * Stop menu BGM. MUST be called when entering the Level scene, which owns the
+ * battle synth audio.
  */
 export function stopMenuBgm() {
   if (!current) return;

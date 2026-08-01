@@ -1,6 +1,6 @@
 /**
  * backdrop — DESIGN.md §7: a shared programmatic synthwave backdrop for the
- * menu-style scenes (Boot / Menu / Calibration / Upgrade / GameOver).
+ * menu-style scenes (Boot / Menu / Upgrade / GameOver).
  *
  * Sky gradient rising to a purple horizon, a wireframe grid converging on the
  * horizon line, and faint scanlines over everything. Pure primitives — no

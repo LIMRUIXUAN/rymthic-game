@@ -9,7 +9,7 @@ import { COLORS, CSS, FONT } from '../core/Theme.js';
 import { drawBackdrop } from '../ui/backdrop.js';
 import { makeButton, makeCard, openModal } from '../ui/widgets.js';
 import { hasTexture } from '../core/Assets.js';
-import { playMenuBgm } from '../core/Bgm.js';
+import { playMenuBgm, setMenuBgmVolume } from '../core/Bgm.js';
 
 export class MenuScene extends Phaser.Scene {
   constructor() { super('Menu'); }
@@ -99,11 +99,6 @@ export class MenuScene extends Phaser.Scene {
       b.container.setDepth(3);
       if (item.label.startsWith('UNLOCKS')) this.unlocksBtn = b;
     });
-
-    this.add.text(W - 14, H - 14,
-      `offset ${saveManager.settings.audioOffsetMs > 0 ? '+' : ''}${saveManager.settings.audioOffsetMs}ms`, {
-      fontFamily: FONT.body, fontSize: '13px', color: CSS.textFaint,
-    }).setOrigin(1, 1);
 
     // CC BY 4.0 attribution (required by incompetech licensing) + menu BGM.
     this.add.text(14, H - 14,
@@ -206,38 +201,79 @@ export class MenuScene extends Phaser.Scene {
   }
 
   showPractice() {
-    openModal(this, { w: 520, h: 260, build: (content, close) => {
+    openModal(this, { w: 620, h: 360, build: (content, close) => {
       const scene = content.scene;
-      content.add(scene.add.text(260, 56, 'BALL HOP PRACTICE', {
+      content.add(scene.add.text(310, 42, 'INFINITE PRACTICE', {
         fontFamily: FONT.display, fontSize: '24px', fontStyle: '700', color: CSS.cyan,
       }).setOrigin(0.5));
-      content.add(scene.add.text(260, 112,
-        'Practice will replay a route without risking your active run. It is the next Ball Hop feature.', {
-          fontFamily: FONT.body, fontSize: '17px', color: CSS.textSecondary, align: 'center', wordWrap: { width: 390 },
+      content.add(scene.add.text(310, 82,
+        'No damage and no damage taken. Practice forever, then press ESC to return.', {
+          fontFamily: FONT.body, fontSize: '16px', color: CSS.textSecondary,
+          align: 'center', wordWrap: { width: 500 },
         }).setOrigin(0.5));
-      const closeBtn = makeButton(scene, { x: 260, y: 205, w: 180, h: 44, label: 'CLOSE', color: COLORS.cyan, fontSize: 15, variant: 'secondary', onClick: close });
-      content.add(closeBtn.container);
+      const ball = makeButton(scene, {
+        x: 170, y: 170, w: 250, h: 56, label: 'BALL HOP', color: COLORS.cyan,
+        fontSize: 18, variant: 'primary', onClick: () => this.startPractice('ballhop'),
+      });
+      const osu = makeButton(scene, {
+        x: 450, y: 170, w: 250, h: 56, label: 'OSU CIRCLES', color: COLORS.magenta,
+        fontSize: 18, variant: 'primary', onClick: () => this.startPractice('osu'),
+      });
+      const closeBtn = makeButton(scene, {
+        x: 310, y: 286, w: 180, h: 44, label: 'CLOSE', color: COLORS.cyan,
+        fontSize: 15, variant: 'secondary', onClick: close,
+      });
+      content.add([ball.container, osu.container, closeBtn.container]);
     }});
   }
 
+  startPractice(mode) {
+    music.sfx('ui');
+    this.scene.start('Practice', { mode });
+  }
+
   showAudio() {
-    openModal(this, { w: 560, h: 360, build: (content, close) => {
+    openModal(this, { w: 640, h: 360, build: (content, close) => {
       const scene = content.scene;
-      content.add(scene.add.text(280, 42, 'AUDIO CONTROL', {
+      content.add(scene.add.text(320, 38, 'AUDIO CONTROL', {
         fontFamily: FONT.display, fontSize: '25px', fontStyle: '700', color: CSS.cyan,
       }).setOrigin(0.5));
+      content.add(scene.add.text(320, 72,
+        'MUSIC controls menu and battle tracks. SFX controls hit and UI feedback.', {
+          fontFamily: FONT.body, fontSize: '15px', color: CSS.textSecondary, align: 'center',
+        }).setOrigin(0.5));
       const makeVolume = (label, key, y) => {
-        const value = scene.add.text(280, y, '', { fontFamily: FONT.display, fontSize: '25px', fontStyle: '700', color: CSS.textPrimary }).setOrigin(0.5);
-        const refresh = () => value.setText(`${label}  ${Math.round(saveManager.settings[key] * 100)}%`);
-        const down = makeButton(scene, { x: 180, y, w: 66, h: 42, label: '−', color: COLORS.cyan, fontSize: 20, variant: 'secondary', onClick: () => { saveManager.setSetting(key, Phaser.Math.Clamp(saveManager.settings[key] - 0.05, 0, 1)); if (key === 'musicVol') music.setMusicVolume(saveManager.settings[key]); else music.setSfxVolume(saveManager.settings[key]); refresh(); } });
-        const up = makeButton(scene, { x: 380, y, w: 66, h: 42, label: '+', color: COLORS.cyan, fontSize: 20, variant: 'secondary', onClick: () => { saveManager.setSetting(key, Phaser.Math.Clamp(saveManager.settings[key] + 0.05, 0, 1)); if (key === 'musicVol') music.setMusicVolume(saveManager.settings[key]); else music.setSfxVolume(saveManager.settings[key]); refresh(); } });
-        content.add([value, down.container, up.container]); refresh();
+        const value = scene.add.text(320, y, '', { fontFamily: FONT.display, fontSize: '25px', fontStyle: '700', color: CSS.textPrimary }).setOrigin(0.5);
+        const meter = scene.add.graphics();
+        const refresh = () => {
+          const amount = Phaser.Math.Clamp(saveManager.settings[key], 0, 1);
+          value.setText(`${label}  ${Math.round(amount * 100)}%`);
+          meter.clear();
+          meter.fillStyle(COLORS.card, 0.9);
+          meter.fillRoundedRect(250, y + 24, 140, 8, 4);
+          meter.fillStyle(COLORS.cyan, 0.95);
+          meter.fillRoundedRect(252, y + 26, 136 * amount, 4, 2);
+        };
+        const apply = () => {
+          if (key === 'musicVol') {
+            music.setMusicVolume(saveManager.settings[key]);
+            setMenuBgmVolume();
+          } else {
+            music.setSfxVolume(saveManager.settings[key]);
+            music.sfx('ui');
+          }
+          refresh();
+        };
+        const down = makeButton(scene, { x: 210, y, w: 66, h: 42, label: '−', color: COLORS.cyan, fontSize: 20, variant: 'secondary', onClick: () => { saveManager.setSetting(key, Phaser.Math.Clamp(saveManager.settings[key] - 0.05, 0, 1)); apply(); } });
+        const up = makeButton(scene, { x: 430, y, w: 66, h: 42, label: '+', color: COLORS.cyan, fontSize: 20, variant: 'secondary', onClick: () => { saveManager.setSetting(key, Phaser.Math.Clamp(saveManager.settings[key] + 0.05, 0, 1)); apply(); } });
+        content.add([meter, value, down.container, up.container]); refresh();
       };
-      makeVolume('MUSIC', 'musicVol', 116);
-      makeVolume('SFX', 'sfxVol', 176);
-      const calibrate = makeButton(scene, { x: 280, y: 244, w: 280, h: 44, label: 'RECALIBRATE AUDIO', color: COLORS.magenta, fontSize: 14, variant: 'primary', onClick: () => this.scene.start('Calibration') });
-      const closeBtn = makeButton(scene, { x: 280, y: 302, w: 160, h: 36, label: 'CLOSE', color: COLORS.cyan, fontSize: 13, variant: 'secondary', onClick: close });
-      content.add([calibrate.container, closeBtn.container]);
+      makeVolume('MUSIC', 'musicVol', 122);
+      makeVolume('SFX', 'sfxVol', 188);
+      const previewBtn = makeButton(scene, { x: 320, y: 254, w: 220, h: 36, label: 'PREVIEW SFX', color: COLORS.magenta, fontSize: 13, variant: 'secondary', onClick: () => music.sfx('ui') });
+      const closeBtn = makeButton(scene, { x: 320, y: 308, w: 160, h: 36, label: 'CLOSE', color: COLORS.cyan, fontSize: 13, variant: 'secondary', onClick: close });
+      content.add(previewBtn.container);
+      content.add(closeBtn.container);
     }});
   }
 

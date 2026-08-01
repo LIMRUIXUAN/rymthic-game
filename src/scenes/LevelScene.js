@@ -52,7 +52,6 @@ export class LevelScene extends Phaser.Scene {
 
     // ---- core wiring ----
     this.conductor = new Conductor(music);
-    this.conductor.userOffsetMs = saveManager.settings.audioOffsetMs || 0;
     this.skills = new SkillEngine(this.run, this.conductor);
     this.skills.fx = (text, color) => this.floatText(text, color);
     this.combat = new CombatResolver(this.run, this.enemy, this.skills, this.conductor);
@@ -159,7 +158,8 @@ export class LevelScene extends Phaser.Scene {
     this.topHud.setPhrase(
       `LEVEL ${this.run.level}  ·  PHRASE ${this.phraseIndex + 1}/${this.chart.phrases.length}  ·  ` +
       `${isEnemy ? 'DEFEND' : 'ATTACK'}  ·  ${this.phrase.archetype}` +
-      (this.minigame.mirrored ? '  ·  MIRRORED' : ''),
+      (this.minigame.mirrored ? '  ·  MIRRORED' : '') +
+      (this.run.stageDamageMult > 1 ? `  ·  DMG ×${this.run.stageDamageMult.toFixed(2)}` : ''),
       isEnemy ? COLORS.enemy : COLORS.hero);
 
     this.topHud.setState(isEnemy ? ENEMY_STATE.WINDUP : ENEMY_STATE.IDLE, 500);
@@ -596,11 +596,10 @@ export class LevelScene extends Phaser.Scene {
       this.topHud.setState(ENEMY_STATE.DEATH, 900);
       music.sfx('death');
       this.showBanner('ENEMY DOWN', 0x8bff5e);
-      const cleared = this.run.level >= 20;
       this.run.onLevelClear();
       saveManager.saveRun(this.run);
       this.time.delayedCall(1500, () => {
-        if (cleared) this.scene.start('GameOver', { run: this.run, cleared: true, won: true });
+        if (this.run.level >= 20) this.scene.start('GameOver', { run: this.run, cleared: true, won: true });
         else this.scene.start('Upgrade', { run: this.run });
       });
     } else {

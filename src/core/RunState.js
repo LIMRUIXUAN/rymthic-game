@@ -5,19 +5,31 @@
 import { SKILL_BY_ID } from '../data/skills.js';
 import { petMultiplier, PET_BY_ID } from '../data/pets.js';
 
-export const BASE = { hp: 100, mana: 30, def: 0, atk: 20 };
-export const GAIN = { hp: 12, mana: 5, def: 4, atk: 3 };
+export const BASE = { hp: 100, mana: 50, def: 0, atk: 20 };
+export const GAIN = { hp: 12, mana: 10, def: 4, atk: 3 };
+export const ATTACK_ROLLS = [2, 3];
 export const POINTS_PER_LEVEL = 3;
 
 export const DIFF_NAMES = ['Chill', 'Normal', 'Hurry', 'Frenzy'];
 export const DIFF_ATK = [1.0, 1.30, 1.60, 2.00];
 export const DIFF_RISK = [1.0, 1.45, 2.00, 2.80];
 
+// Damage gets more explosive after stage 8, while stages 1-8 keep their
+// existing balance.
+export const DAMAGE_ESCALATION_START_LEVEL = 9;
+export const DAMAGE_ESCALATION_STEP = 0.06;
+
+export function stageDamageMultiplier(level) {
+  const extraStages = Math.max(0, Math.floor(level) - DAMAGE_ESCALATION_START_LEVEL + 1);
+  return 1 + extraStages * DAMAGE_ESCALATION_STEP;
+}
+
 export class RunState {
   constructor(seed = Date.now()) {
     this.seed = seed;
     this.level = 1;
     this.points = { hp: 0, mana: 0, def: 0, atk: 0 };
+    this.atkRolls = [];
     this.unspentPoints = 0;
 
     this.skills = [];        // array of skill ids, max 10
@@ -25,7 +37,7 @@ export class RunState {
     this.diffTier = 1;       // starts on Normal
 
     this.hp = this.maxHp;
-    this.mana = 0;
+    this.mana = this.maxMana * 0.5;
     this.combo = 0;
     this.maxComboThisLevel = 0;
     // Lens are earned only when Boost is active and the player lands a tile.
@@ -35,6 +47,9 @@ export class RunState {
 
     // transient per-run flags used by skills
     this.secondWindUsed = false;
+    // One transition grace hit prevents an immediate death on entering the
+    // post-stage-8 damage curve. It is not permanent loss protection.
+    this.postStage8GraceUsed = false;
     this.ghostCharges = 0;
     this.mirrorPhrases = 0;
     this.silencePhrases = 0;
@@ -77,12 +92,18 @@ export class RunState {
     if (petBase?.defPenalty) d *= (1 - petBase.defPenalty);
     return d;
   }
-  get atk() { return BASE.atk + this.points.atk * GAIN.atk; }
+  get atk() {
+    // Existing/manual builds without rolls retain the old +3-per-point value.
+    const rolled = this.atkRolls.reduce((sum, gain) => sum + gain, 0);
+    const unrolled = Math.max(0, this.points.atk - this.atkRolls.length) * GAIN.atk;
+    return BASE.atk + rolled + unrolled;
+  }
 
   get diffName() { return DIFF_NAMES[this.diffTier]; }
   get diffAtk() { return DIFF_ATK[this.diffTier]; }
   get diffRisk() { return DIFF_RISK[this.diffTier]; }
   get petMult() { return petMultiplier(this.pet); }
+  get stageDamageMult() { return stageDamageMultiplier(this.level); }
 
   /** Diminishing-returns damage reduction, capped well below immortality. */
   get defReduction() { return this.def / (this.def + 100); }
@@ -121,9 +142,12 @@ export class RunState {
   spendPoint(stat) {
     if (this.unspentPoints <= 0 || !(stat in this.points)) return false;
     const beforeMax = this.maxHp;
+    const beforeManaMax = this.maxMana;
     this.points[stat]++;
     this.unspentPoints--;
     if (stat === 'hp') this.hp += this.maxHp - beforeMax; // new HP is granted, not just capacity
+    if (stat === 'mana') this.mana += this.maxMana - beforeManaMax;
+    if (stat === 'atk') this.atkRolls.push(ATTACK_ROLLS[Math.floor(Math.random() * ATTACK_ROLLS.length)]);
     return true;
   }
 
@@ -179,10 +203,12 @@ export class RunState {
   serialize() {
     return {
       seed: this.seed, level: this.level, points: { ...this.points },
+      atkRolls: [...this.atkRolls],
       unspentPoints: this.unspentPoints, skills: [...this.skills],
       pet: this.pet ? { ...this.pet } : null, hp: this.hp, mana: this.mana,
       lens: this.lens,
       secondWindUsed: this.secondWindUsed, maxHpPenalty: this.maxHpPenalty,
+      postStage8GraceUsed: this.postStage8GraceUsed,
       totalDamageDealt: this.totalDamageDealt,
     };
   }
@@ -191,9 +217,11 @@ export class RunState {
     const r = new RunState(data.seed);
     Object.assign(r, {
       level: data.level, points: data.points, unspentPoints: data.unspentPoints,
+      atkRolls: Array.isArray(data.atkRolls) ? data.atkRolls.filter((gain) => ATTACK_ROLLS.includes(gain)) : [],
       skills: data.skills || [], pet: data.pet || null,
       lens: Math.max(0, Math.floor(data.lens || 0)),
       secondWindUsed: !!data.secondWindUsed, maxHpPenalty: data.maxHpPenalty || 0,
+      postStage8GraceUsed: !!data.postStage8GraceUsed,
       totalDamageDealt: data.totalDamageDealt || 0,
     });
     r.hp = Math.min(data.hp ?? r.maxHp, r.maxHp);

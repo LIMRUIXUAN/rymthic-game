@@ -102,9 +102,9 @@ export class UpgradeScene extends Phaser.Scene {
 
     const stats = [
       ['hp', 'HEALTH', '+12 max HP', COLORS.great],
-      ['mana', 'MANA', '+5 max mana', COLORS.perfect],
+      ['mana', 'MANA', '+10 max mana + refill', COLORS.perfect],
       ['def', 'DEFENSE', '+4 DEF (diminishing)', COLORS.violet],
-      ['atk', 'ATTACK', '+3 ATK', COLORS.orange],
+      ['atk', 'ATTACK', '+2 or +3 ATK', COLORS.orange],
     ];
 
     this.statRows = {};

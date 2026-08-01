@@ -6,13 +6,12 @@ A rhythm roguelike built with Phaser. The enemy sets the tempo, and you answer w
 
 ## What is it?
 
-Build a run through 20 levels, choosing stats, skills, and pets as the pressure rises. Each phrase asks you to defend against incoming notes or turn accurate hits into damage. Death ends the run, while Shards unlock more options for future attempts.
+Build a run through 20 levels, choosing stats, skills, and pets as the pressure rises. Each phrase asks you to defend against incoming notes or turn accurate hits into damage. After stage 8, both sides receive escalating damage and the player gets one transition grace hit, while Shards unlock more options for future attempts.
 
 The game includes:
 
 - Two movement-focused rhythm modes: Ball Hop for levels 1 to 10, then Osu Circles for levels 11 to 20.
 - 24 player skills, six pets, and enemy abilities that change how a phrase plays.
-- Local calibration for audio latency.
 - Procedural combat music, menu tracks, and persistent local progression.
 
 ## How to play
@@ -58,7 +57,7 @@ src/
 ├── core/        Timing, combat, music, saves, skills, and run state
 ├── data/        Enemies, skills, and pets
 ├── minigames/   Ball Hop, Osu Circles, and the shared game contract
-├── scenes/      Boot, calibration, menu, upgrades, levels, and game over
+├── scenes/      Boot, menu, upgrades, levels, and game over
 └── ui/          HUDs, effects, widgets, and backdrop rendering
 ```
 
@@ -72,4 +71,4 @@ The design and balancing references live in [GAME_DESIGN.md](GAME_DESIGN.md), [D
 
 ## Status
 
-RYTHMIC is playable from start to finish with 20 levels, permadeath, progression, skills, pets, and both rhythm modes. Feedback and bug reports are welcome through the repository issues.
+RYTHMIC is playable from start to finish with 20 levels, progression, skills, pets, and both rhythm modes. Feedback and bug reports are welcome through the repository issues.

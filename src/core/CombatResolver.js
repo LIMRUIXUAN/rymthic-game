@@ -1,10 +1,10 @@
 /**
  * CombatResolver — turns judgments into HP changes, in both directions.
- * These formulas are the ones verified in tools/balance_sim.py. If you edit a
- * coefficient here, edit it there and re-run `npm run balance`.
+ * The base formulas are verified in tools/balance_sim.py. The stageDamageMult
+ * term is the endless-route escalation layered on after stage 8.
  *
- *   dealt = ATK x K_OUT x judgeWeight x comboMult x petMult x DIFF_ATK x (1 - enemyDefRed)
- *   taken = enemyATK x K_IN x DIFF_RISK x (1 - heroDefRed)     [per missed note]
+ *   dealt = ... x DIFF_ATK x stageDamageMult x (1 - enemyDefRed)
+ *   taken = enemyATK x K_IN x DIFF_RISK x stageDamageMult x (1 - heroDefRed)
  */
 import { PET_BY_ID } from '../data/pets.js';
 
@@ -43,6 +43,7 @@ export class CombatResolver {
       * this.run.comboMult
       * this.run.petMult
       * this.run.diffAtk
+      * this.run.stageDamageMult
       * (1 - this.enemyDefReduction);
 
     dmg *= this.skills.outgoingMultiplier(this.enemy);
@@ -64,7 +65,7 @@ export class CombatResolver {
     if (judgment.weight > 0) {
       // Blocked. Mirror Shield reflects part of what you stopped.
       if (this.run.mirrorPhrases > 0) {
-        const blocked = this.enemy.atk * K_IN * this.run.diffRisk;
+        const blocked = this.enemy.atk * K_IN * this.run.diffRisk * this.run.stageDamageMult;
         this.applyToEnemy(blocked * 0.4, false);
       }
       return 0;
@@ -80,7 +81,8 @@ export class CombatResolver {
       return 0;
     }
 
-    let dmg = this.enemy.atk * K_IN * this.run.diffRisk * (1 - this.run.defReduction);
+    let dmg = this.enemy.atk * K_IN * this.run.diffRisk
+      * this.run.stageDamageMult * (1 - this.run.defReduction);
     if (this.run.dissonancePhrases > 0) dmg *= 0.7;
 
     dmg = this.skills.transformDamageTaken(dmg, this.enemy);
@@ -100,6 +102,12 @@ export class CombatResolver {
   applyToHero(amount) {
     if (amount <= 0) return;
     const actual = this.run.damage(amount);
+    // Give the stage-8 -> stage-9 transition one grace hit. Later damage can
+    // still kill normally, so this only prevents an immediate transition loss.
+    if (this.run.level >= 9 && !this.run.postStage8GraceUsed && this.run.hp <= 0) {
+      this.run.hp = 1;
+      this.run.postStage8GraceUsed = true;
+    }
     if (actual > 0) this.onHeroDamaged?.(actual);
     if (this.run.hp <= 0) {
       if (this.skills.tryPreventDeath()) return;
@@ -111,7 +119,7 @@ export class CombatResolver {
   counterAttack(accuracy) {
     if (accuracy < 0.95) return 0;
     const dmg = this.run.atk * K_OUT * 8
-      * this.run.comboMult * this.run.petMult * this.run.diffAtk
+      * this.run.comboMult * this.run.petMult * this.run.diffAtk * this.run.stageDamageMult
       * (1 - this.enemyDefReduction) * 0.5;
     this.applyToEnemy(dmg, true);
     return dmg;
@@ -121,7 +129,7 @@ export class CombatResolver {
   applyPetBurn() {
     const pet = this.run.pet ? PET_BY_ID[this.run.pet.id] : null;
     if (pet?.special !== 'burn') return 0;
-    const dmg = this.enemy.maxHp * 0.02;
+    const dmg = this.enemy.maxHp * 0.02 * this.run.stageDamageMult;
     this.applyToEnemy(dmg, false);
     return dmg;
   }
@@ -130,9 +138,10 @@ export class CombatResolver {
 
   endPhrase(phrase, score) {
     if (phrase.type === 'hero') this.run.lastPhraseDamage = this.phraseDamage;
-    // Mana income: 4 + 10 * accuracy^2, squared so sloppy play starves you
+    // Mana income: a stronger baseline plus accuracy scaling, so Mana upgrades
+    // remain useful without making skills unlimited.
     const acc = score.accuracy;
-    this.run.addMana(4 + 10 * acc * acc);
+    this.run.addMana(6 + 14 * acc * acc);
     this.run.accuracyHistory.push(acc);
     this.skills.onPhraseEnd(phrase, score, this.enemy);
     this.run.resetPhraseFlags();
