@@ -34,10 +34,9 @@ export const ASSETS = [
 
 /**
  * Optional sprite-sheet animations (ASSETS.md §6): hero + one sheet per enemy
- * level. Any 4-column grid of square frames is accepted — BootScene loads the
- * raw image, detects the frame size, and slices it into a spritesheet
- * (see Anims.inferSheetFrameSize). The reference layout is 5 rows × 4 cols of
- * 80×80 frames (320×400); extra rows past death are ignored.
+ * level. New assets use an 8-column × 10-row grid of square frames; BootScene
+ * detects the frame size and slices the raw image into a spritesheet. Existing
+ * 4-column legacy sheets are also accepted during the art migration.
  */
 export const ANIM_SHEETS = [
   { key: 'hero_anim', path: '/assets/hero/anim.png' },

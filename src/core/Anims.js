@@ -1,78 +1,106 @@
 /**
  * Anims — sprite-sheet animation definitions (ASSETS.md §6).
  *
- * Sheet grid convention: ANIM_COLS columns of square frames, rows top→bottom:
- *   row 0 idle · row 1 attack · row 2 hurt · row 3 cast · row 4 death
- * Any square-frame grid is accepted: the frame size is detected from the
- * actual image dimensions (see inferSheetFrameSize), so sheets no longer have
- * to be exactly 320×400. Extra rows past death (e.g. a 6th victory row) are
- * simply ignored; missing rows mean those states keep the procedural fallback.
- * Sheets are optional: missing sheets never register anims, and the HUDs keep
- * their procedural animations (see TopHUD/BottomHUD fallbacks).
+ * New sheets use eight columns and ten rows, in this fixed order:
+ * idle, windup, attack, hurt, defense, cast, stun, victory, death, phase_change.
+ * Existing four-column sheets are still accepted with their original five
+ * states so the art migration can happen incrementally.
  */
 import { hasTexture } from './Assets.js';
 
-export const ANIM_STATES = ['idle', 'attack', 'hurt', 'cast', 'death'];
-export const ANIM_COLS = 4;
+export const ANIM_STATES = [
+  'idle', 'windup', 'attack', 'hurt', 'defense',
+  'cast', 'stun', 'victory', 'death', 'phase_change',
+];
+export const LEGACY_ANIM_STATES = ['idle', 'attack', 'hurt', 'cast', 'death'];
+export const ANIM_COLS = 8;
+export const LEGACY_ANIM_COLS = 4;
 
-const FRAME_RATE = { idle: 8, attack: 14, hurt: 14, cast: 12, death: 12 };
+export const ANIM_TIMING = {
+  idle: { frameRate: 8, loop: true },
+  windup: { frameRate: 10, loop: false },
+  attack: { frameRate: 16, loop: false },
+  hurt: { frameRate: 10, loop: false },
+  defense: { frameRate: 8, loop: true },
+  cast: { frameRate: 10, loop: false },
+  stun: { frameRate: 10, loop: false },
+  victory: { frameRate: 8, loop: false, hold: true },
+  death: { frameRate: 10, loop: false, hold: true },
+  phase_change: { frameRate: 8, loop: false, hold: true },
+};
+
+export const ANIM_DURATIONS = {
+  idle: Infinity,
+  windup: 800,
+  attack: 500,
+  hurt: 800,
+  defense: Infinity,
+  cast: 800,
+  stun: 800,
+  victory: 1000,
+  death: 800,
+  phase_change: 1000,
+};
 
 /**
- * Detect the frame grid of a raw sprite sheet (loaded as a plain image).
- *
- * Convention: ANIM_COLS columns; frames are (near-)square, so the frame size
- * follows from the width and the row count from the height. Returns
- * `{ frameWidth, frameHeight, rows }`, or null when the image does not look
- * like a 4-column square-frame grid (caller keeps the procedural fallback).
- *
- *  320×400   → frameWidth 80,  rows 5   (the ASSETS.md reference layout)
- *  1024×1536 → frameWidth 256, rows 6   (AI-generated 4×6 grid)
+ * Detect a square-frame grid. When the column count is omitted, prefer the
+ * new 8×10 contract but recognize the existing 4×5/4×6 legacy sheets too.
  */
-export function inferSheetFrameSize(width, height) {
-  if (!width || !height || width % ANIM_COLS !== 0) return null;
-  const frameWidth = width / ANIM_COLS;
-  const rows = Math.round(height / frameWidth);
-  if (rows < 1) return null;
-  const frameHeight = height / rows;
-  // Reject irregular grids (non-square frames) — they would misalign the rows.
-  if (Math.abs(frameHeight - frameWidth) > frameWidth * 0.15) return null;
-  return {
-    frameWidth,
-    frameHeight: Math.floor(frameHeight),
-    rows,
-  };
+export function inferSheetFrameSize(width, height, columns = null) {
+  if (!width || !height) return null;
+
+  const candidates = columns ? [columns] : [ANIM_COLS, LEGACY_ANIM_COLS];
+  const valid = candidates.map((cols) => {
+    if (width % cols !== 0) return null;
+    const frameWidth = width / cols;
+    const rows = Math.round(height / frameWidth);
+    if (rows < 1) return null;
+    const frameHeight = height / rows;
+    if (Math.abs(frameHeight - frameWidth) > frameWidth * 0.15) return null;
+    return { frameWidth, frameHeight: Math.floor(frameHeight), rows, cols };
+  }).filter(Boolean);
+
+  if (!valid.length) return null;
+  return valid.sort((a, b) => {
+    const aExact = a.rows === (a.cols === ANIM_COLS ? ANIM_STATES.length : LEGACY_ANIM_STATES.length);
+    const bExact = b.rows === (b.cols === ANIM_COLS ? ANIM_STATES.length : LEGACY_ANIM_STATES.length);
+    // 320×400 is the original documented 4×5 reference sheet. Both 4×5 and
+    // 8×10 mathematically fit that aspect ratio, so use the sheet's scale to
+    // disambiguate the old small reference from the new 256px contract.
+    if (aExact && bExact) return width >= 1536 ? (a.cols === ANIM_COLS ? -1 : 1) : (a.cols === LEGACY_ANIM_COLS ? -1 : 1);
+    if (aExact !== bExact) return aExact ? -1 : 1;
+    const aTarget = a.cols === ANIM_COLS ? ANIM_STATES.length : LEGACY_ANIM_STATES.length;
+    const bTarget = b.cols === ANIM_COLS ? ANIM_STATES.length : LEGACY_ANIM_STATES.length;
+    return Math.abs(a.rows - aTarget) - Math.abs(b.rows - bTarget);
+  })[0];
 }
 
-/**
- * Register the state animations for one sprite-sheet texture.
- * `prefix` namespaces the anim keys (e.g. 'hanim', 'eanim_3').
- * Rows are consumed in order from ANIM_STATES: a sheet with fewer rows simply
- * registers fewer states; a sheet with more rows ignores the extras.
- * Returns true when at least one anim was (re)created.
- */
-export function createSheetAnims(scene, texKey, prefix) {
+/** Register all states available in one sheet. */
+export function createSheetAnims(scene, texKey, prefix, grid = null) {
   if (!hasTexture(scene, texKey)) return false;
   const tex = scene.textures.get(texKey);
-  // getFrameNames() excludes '__BASE' by default, so this is the frame count
+  const cols = grid?.cols || ANIM_COLS;
+  const states = cols === LEGACY_ANIM_COLS ? LEGACY_ANIM_STATES : ANIM_STATES;
   const totalFrames = tex.getFrameNames().length;
-  const rows = Math.floor(totalFrames / ANIM_COLS);
+  const rows = Math.floor(totalFrames / cols);
   if (rows < 1) return false;
 
   let created = 0;
-  ANIM_STATES.slice(0, rows).forEach((state, row) => {
+  states.slice(0, rows).forEach((state, row) => {
     const key = `${prefix}_${state}`;
-    if (scene.anims.exists(key)) return; // anims are game-global; create once
-    const start = row * ANIM_COLS;
+    if (scene.anims.exists(key)) return;
+    const start = row * cols;
     const frames = scene.anims.generateFrameNumbers(texKey, {
       start,
-      end: start + ANIM_COLS - 1,
+      end: start + cols - 1,
     });
     if (!frames.length) return;
+    const timing = ANIM_TIMING[state] || { frameRate: 10, loop: false };
     scene.anims.create({
       key,
       frames,
-      frameRate: FRAME_RATE[state],
-      repeat: state === 'idle' ? -1 : 0,
+      frameRate: timing.frameRate,
+      repeat: timing.loop ? -1 : 0,
     });
     created++;
   });

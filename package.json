@@ -8,8 +8,9 @@
     "build": "node tools/clean-dist.mjs && vite build && node tools/prepare-static-hosting.mjs",
     "preview": "vite preview",
     "balance": "python3 tools/balance_sim.py",
-    "test": "node tests/combat.test.js",
+    "test": "node tests/combat.test.js && node tests/anims.test.mjs",
     "test:scene": "node tests/scene.test.mjs",
+    "test:assets": "node tools/validate_animation_assets.mjs",
     "test:browser": "vite build && node tests/smoke.mjs dist/client"
   },
   "dependencies": {

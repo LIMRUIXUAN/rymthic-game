@@ -11,11 +11,15 @@ import Phaser from 'phaser';
 import { COLORS, CSS, FONT, css } from '../core/Theme.js';
 import { TOP_HUD_H, HUD_PAD } from '../core/Layout.js';
 import { enemyTexKey } from '../core/Assets.js';
-import { hasEnemyAnim, enemyAnimTexKey, enemyAnimPrefix } from '../core/Anims.js';
+import {
+  hasEnemyAnim, enemyAnimTexKey, enemyAnimPrefix,
+  ANIM_DURATIONS,
+} from '../core/Anims.js';
 
 export const ENEMY_STATE = {
   IDLE: 'idle', WINDUP: 'windup', ATTACK: 'attack',
-  HURT: 'hurt', CAST: 'cast', DEATH: 'death',
+  HURT: 'hurt', DEFENSE: 'defense', CAST: 'cast', STUN: 'stun',
+  VICTORY: 'victory', DEATH: 'death', PHASE_CHANGE: 'phase_change',
 };
 
 export class TopHUD {
@@ -52,7 +56,7 @@ export class TopHUD {
     this.aura = s.add.circle(0, 0, size * 0.85, this.enemy.color, 0.14);
 
     // ASSETS.md §6: multi-frame sprite-sheet animation replaces the procedural
-    // face entirely (idle/attack/hurt/cast/death rows). Fallback: static art,
+    // face entirely (the 10-state animation rows). Fallback: static art,
     // then the procedural face.
     this.animSprite = null;
     this.avatarImg = null;
@@ -151,24 +155,29 @@ export class TopHUD {
     this.phraseText.setText(text).setColor(css(colorHex));
   }
 
-  setState(state, durationMs = 400) {
+  setState(state, durationMs = null) {
     this.state = state;
-    this.stateUntil = performance.now() + durationMs;
+    const defaultDuration = ANIM_DURATIONS[state] ?? 400;
+    const duration = durationMs ?? defaultDuration;
+    this.stateUntil = Number.isFinite(duration) ? performance.now() + duration : Infinity;
 
     // ASSETS.md §6: sprite-sheet animation path — one anim per state, then
-    // back to idle (death plays once and stays). Partial sheets (fewer than
-    // 5 rows) fall through to the procedural feedback for the missing state.
+    // back to idle. Partial sheets fall through to procedural feedback for
+    // the missing state.
     if (this.animSprite) {
       const map = {
-        [ENEMY_STATE.IDLE]: 'idle', [ENEMY_STATE.WINDUP]: 'cast',
+        [ENEMY_STATE.IDLE]: 'idle', [ENEMY_STATE.WINDUP]: 'windup',
         [ENEMY_STATE.ATTACK]: 'attack', [ENEMY_STATE.HURT]: 'hurt',
-        [ENEMY_STATE.CAST]: 'cast', [ENEMY_STATE.DEATH]: 'death',
+        [ENEMY_STATE.DEFENSE]: 'defense', [ENEMY_STATE.CAST]: 'cast',
+        [ENEMY_STATE.STUN]: 'stun', [ENEMY_STATE.VICTORY]: 'victory',
+        [ENEMY_STATE.DEATH]: 'death', [ENEMY_STATE.PHASE_CHANGE]: 'phase_change',
       };
       const prefix = enemyAnimPrefix(this.enemy.level);
       const anim = `${prefix}_${map[state] || 'idle'}`;
       if (this.scene.anims.exists(anim)) {
-        this.animSprite.play(anim, state === ENEMY_STATE.IDLE);
-        if (state === ENEMY_STATE.DEATH) {
+        this.animSprite.setVisible(true);
+        this.animSprite.play(anim, state === ENEMY_STATE.IDLE || state === ENEMY_STATE.DEFENSE);
+        if ([ENEMY_STATE.DEATH, ENEMY_STATE.VICTORY, ENEMY_STATE.PHASE_CHANGE].includes(state)) {
           this.animSprite.once('animationcomplete', () => {
             this.animSprite?.stop();
           });
@@ -176,11 +185,14 @@ export class TopHUD {
         if (state === ENEMY_STATE.ATTACK) {
           this.scene.tweens.add({ targets: this.container, x: this.container.x + 14, duration: 90, yoyo: true, ease: 'Quad.easeOut' });
         }
+        if (state === ENEMY_STATE.PHASE_CHANGE) {
+          this.scene.tweens.add({ targets: this.aura, scale: 1.9, alpha: 0.7, duration: 220, yoyo: true });
+        }
         return;
       }
-      // Missing state anim: hide the sprite so the procedural death collapse
-      // reads clearly, then fall through to the procedural feedback below.
-      if (state === ENEMY_STATE.DEATH) this.animSprite.setVisible(false);
+      // Missing state anim: hide the sprite so the procedural feedback reads
+      // clearly, then fall through to the procedural feedback below.
+      this.animSprite.setVisible(false);
     }
 
     const s = this.scene;
@@ -199,8 +211,26 @@ export class TopHUD {
           else this.body?.setFillStyle(this.enemy.color);
         });
         break;
+      case ENEMY_STATE.DEFENSE:
+        s.tweens.add({ targets: this.aura, scale: 1.45, alpha: 0.55, duration: 240, yoyo: true, repeat: 1 });
+        break;
       case ENEMY_STATE.CAST:
         s.tweens.add({ targets: this.aura, scale: 1.6, alpha: 0.45, duration: 260, yoyo: true });
+        break;
+      case ENEMY_STATE.STUN:
+        if (this.avatarImg) this.avatarImg.setTint(0xffffff);
+        else this.body?.setFillStyle(0xffffff);
+        s.tweens.add({ targets: this.container, angle: 5, duration: 70, yoyo: true, repeat: 3 });
+        s.time.delayedCall(420, () => {
+          if (this.avatarImg) this.avatarImg.clearTint();
+          else this.body?.setFillStyle(this.enemy.color);
+        });
+        break;
+      case ENEMY_STATE.VICTORY:
+        s.tweens.add({ targets: this.container, y: this.container.y - 5, scale: 1.08, duration: 260, yoyo: true, repeat: 1 });
+        break;
+      case ENEMY_STATE.PHASE_CHANGE:
+        s.tweens.add({ targets: this.aura, scale: 1.9, alpha: 0.7, duration: 220, yoyo: true });
         break;
       case ENEMY_STATE.WINDUP:
         s.tweens.add({ targets: this.container, scaleX: 0.86, scaleY: 1.16, duration: 200, yoyo: true });
@@ -232,7 +262,7 @@ export class TopHUD {
   }
 
   onBeat() {
-    if (this.state === ENEMY_STATE.DEATH) return;
+    if ([ENEMY_STATE.DEATH, ENEMY_STATE.VICTORY, ENEMY_STATE.PHASE_CHANGE].includes(this.state)) return;
     this.scene.tweens.add({
       targets: this.container, scaleY: 0.93, scaleX: 1.04,
       duration: 80, yoyo: true, ease: 'Quad.easeOut',
@@ -240,15 +270,20 @@ export class TopHUD {
   }
 
   update() {
-    if (this.state === ENEMY_STATE.DEATH) return;
+    if ([ENEMY_STATE.DEATH, ENEMY_STATE.VICTORY, ENEMY_STATE.PHASE_CHANGE].includes(this.state)) return;
 
     // sprite-sheet animation: return to idle once a transient state times out
     if (this.animSprite) {
-      if (this.state === ENEMY_STATE.IDLE) {
-        this.animSprite.play(`${enemyAnimPrefix(this.enemy.level)}_idle`, true);
+      if (this.state === ENEMY_STATE.IDLE || this.state === ENEMY_STATE.DEFENSE) {
+        const key = `${enemyAnimPrefix(this.enemy.level)}_${this.state}`;
+        if (this.scene.anims.exists(key)) this.animSprite.play(key, true);
       } else if (performance.now() > this.stateUntil) {
         this.state = ENEMY_STATE.IDLE;
-        this.animSprite.play(`${enemyAnimPrefix(this.enemy.level)}_idle`, true);
+        const idle = `${enemyAnimPrefix(this.enemy.level)}_idle`;
+        if (this.scene.anims.exists(idle)) {
+          this.animSprite.setVisible(true);
+          this.animSprite.play(idle, true);
+        }
       }
       this.container.y = this.avatarY + Math.sin(performance.now() / 620) * 4;
       return;

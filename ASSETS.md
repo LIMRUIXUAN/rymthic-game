@@ -165,34 +165,57 @@
 
 | 素材 | 文件 | 网格 |
 |---|---|---|
-| 英雄动画 | `public/assets/hero/anim.png` | 4 列 × 5 行（参考） |
-| 敌人动画（第 n 关） | `public/assets/enemies/enemy_anim_<n>.png`（如 `enemy_anim_01.png`） | 4 列 × 5 行（参考） |
+| 英雄动画 | `public/assets/hero/anim.png` | 8 列 × 10 行（可选） |
+| 敌人动画（第 n 关） | `public/assets/enemies/enemy_anim_<n>.png`（如 `enemy_anim_01.png`） | 8 列 × 10 行 |
 
-- **参考布局**：每帧 80×80 → 整图 **320 × 400**（5 行 × 4 列，行序从上到下）
-- **自适应**：游戏会按图片实际尺寸自动检测帧大小——只要是「4 列、方形帧」的网格都能用（如 AI 生成的 1024×1536 = 4 列 × 6 行、每帧 256×256 也直接生效）。行数 ≥5 取前 5 行，多出的行（如 victory）忽略；行数不足则缺失状态自动回退程序化动画
-- PNG-32 透明背景；主体占每帧中央 **85-90%**（显示时缩到 40×40，四边留安全边）
+- **新布局**：每帧 **256×256** → 整图 **2048 × 2560**（10 行 × 8 列，行序从上到下）
+- **自适应/兼容**：游戏会按图片实际尺寸自动检测方形帧；旧版 4 列 × 5/6 行素材仍会按旧状态顺序加载，方便逐步替换
+- PNG-32 透明背景；主体占每帧中央 **85-90%**（显示时缩到 80×80，四边留安全边）
 
 ### 6.2 行序（从上到下，固定顺序，每行 4 帧从左到右）
 
 | 行 | 状态 | 播放参数（游戏内已定） | 每帧动作建议 |
 |---|---|---|---|
-| 0 | `idle` | 8 fps，循环 | 呼吸/浮动 2-4 帧循环（首尾要能无缝衔接） |
-| 1 | `attack` | 14 fps，播一次 | 前摇 → 挥击/前冲 → 收回（第 1 帧≈idle，第 4 帧≈idle，方便衔接） |
-| 2 | `hurt` | 14 fps，播一次 | 受击后仰/闪白/抖动 |
-| 3 | `cast` | 12 fps，播一次 | 施法蓄力（抬手发光/光环） |
-| 4 | `death` | 12 fps，播一次（停最后一帧） | 塌缩/破碎/消散 |
+| 0 | `idle` | 8 fps，循环 | 呼吸/浮动，首尾无缝衔接 |
+| 1 | `windup` | 10 fps，0.8 秒 | 蓄力/准备攻击 |
+| 2 | `attack` | 16 fps，0.5 秒 | 前摇 → 挥击/前冲 → 收回 |
+| 3 | `hurt` | 10 fps，0.8 秒 | 后仰、闪白、抖动 |
+| 4 | `defense` | 8 fps，循环 | 举盾/护体姿势 |
+| 5 | `cast` | 10 fps，0.8 秒 | 施法蓄力、光环增强 |
+| 6 | `stun` | 10 fps，0.8 秒 | 失衡、眩晕、星芒/抖动 |
+| 7 | `victory` | 8 fps，1 秒，停最后一帧 | 胜利姿态 |
+| 8 | `death` | 10 fps，0.8 秒，停最后一帧 | 塌缩/破碎/消散 |
+| 9 | `phase_change` | 8 fps，1 秒，停最后一帧 | Boss 阶段变化 |
 
 ### 6.3 绘制要求
 
 - **同一角色形象**必须与静态头像（§1.3）一致——动画行和头像画同一个角色
 - 动作幅度：**小但清晰**——显示尺寸只有 40×40，大幅位移会糊；用「关键帧差异」表达动作（前倾、后仰、压扁、拉伸），不要依赖微小位移
-- attack 的第 4 帧与 idle 第 1 帧相似 → 攻击后平滑回 idle
+- attack 的第 8 帧与 idle 第 1 帧相似 → 攻击后平滑回 idle
 - 每帧主体位置尽量居中稳定（不要整体漂移，游戏内还会叠加 beat-bop 缩放）
 - 颜色沿用 §1.3 敌人主色表；boss 动画可加特效帧（闪光/粒子感）
 
 ### 6.4 生效方式
 
-放文件 → 重启游戏（`npm run dev`）→ 对应敌人/英雄自动播放动画；没放的文件对应敌人继续用程序化动画。验证：浏览器 console 会打印 `[assets] missing, using procedural fallback: enemy_anim_03` 说明该关没放动画；打印 `does not look like a 4-column square-frame grid` 说明图片格式不对（不是 4 列方形帧网格）。
+放文件 → 重启游戏（`npm run dev`）→ 对应敌人/英雄自动播放动画；没放的文件对应敌人继续用程序化动画。验证：浏览器 console 会打印 `[assets] missing, using procedural fallback: enemy_anim_03` 说明该关没放动画；打印 `does not look like a 4-column/8-column square-frame grid` 说明图片格式不对。
+
+### 6.5 单帧留存与组装
+
+单帧素材按以下路径留存：
+
+`public/assets/enemies/frames/e01/<state>/01.png` … `08.png`
+
+每帧必须是 256×256、PNG-32、透明四角。完成一名敌人的 80 帧后，运行：
+
+```text
+python tools/assemble_enemy_sheet.py --enemy 1
+```
+
+验证全部已放入的素材：
+
+```text
+npm run test:assets
+```
 
 ---
 
@@ -207,6 +230,6 @@
 
 **动画**：
 - spritesheet key：`hero_anim` / `enemy_anim_<n>`（n=1..20）
-- 动画 key：`hanim_<state>`（英雄）/ `eanim_<n>_<state>`（敌人），state ∈ idle/attack/hurt/cast/death
+- 动画 key：`hanim_<state>`（英雄）/ `eanim_<n>_<state>`（敌人），state ∈ idle/windup/attack/hurt/defense/cast/stun/victory/death/phase_change
 
 **验证方式**：放入文件后跑 `npm run dev`，看对应位置是否替换了程序化图形；或跑 `npm run build && npm run test:browser`（smoke 不因缺素材失败——缺素材自动回退是设计行为）。

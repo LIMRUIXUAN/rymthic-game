@@ -57,7 +57,7 @@ export class BootScene extends Phaser.Scene {
       const prefix = a.key === 'hero_anim'
         ? 'hanim'
         : enemyAnimPrefix(Number(a.key.replace('enemy_anim_', '')));
-      createSheetAnims(this, a.key, prefix);
+      createSheetAnims(this, a.key, prefix, grid);
     });
 
     const { width: W, height: H } = this.scale;

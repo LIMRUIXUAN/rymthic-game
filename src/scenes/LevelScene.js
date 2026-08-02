@@ -41,6 +41,7 @@ export class LevelScene extends Phaser.Scene {
     this._lastHalfTime = false;
     // Phaser reuses scene instances, so every latch has to be cleared here.
     this._kickerUsed = false;
+    this._bossPhaseIndex = 0;
   }
 
   create() {
@@ -324,6 +325,11 @@ export class LevelScene extends Phaser.Scene {
       case 'shield':
         this.enemy.def = this.enemy.baseDef + 40;
         this.enemy.shieldPhrases = 2;
+        this.time.delayedCall(800, () => {
+          if (!this.finished && this.enemy.shieldPhrases > 0) {
+            this.topHud.setState(ENEMY_STATE.DEFENSE);
+          }
+        });
         break;
       case 'accelerando':
         this.accelerando = Math.min(4, (this.accelerando || 0) + 1);
@@ -459,7 +465,6 @@ export class LevelScene extends Phaser.Scene {
     if (this.phrase?.type === 'hero') {
       const dmg = this.combat.resolveHeroNote(j);
       if (dmg > 0) {
-        this.topHud.setState(ENEMY_STATE.HURT, 200);
         this.bottomHud.playAttack(); // ASSETS.md §6 hero attack anim
       }
     } else {
@@ -473,6 +478,22 @@ export class LevelScene extends Phaser.Scene {
   }
 
   onEnemyDamaged(amount, crit) {
+    const hpPct = this.enemy.maxHp > 0 ? this.enemy.hp / this.enemy.maxHp : 0;
+    if (this.enemy.isBoss) {
+      const nextPhase = hpPct <= 0.33 ? 2 : hpPct <= 0.66 ? 1 : 0;
+      if (nextPhase > this._bossPhaseIndex) {
+        this._bossPhaseIndex = nextPhase;
+        this.topHud.setState(ENEMY_STATE.PHASE_CHANGE);
+      } else if (crit) {
+        this.topHud.setState(ENEMY_STATE.STUN);
+      } else {
+        this.topHud.setState(ENEMY_STATE.HURT);
+      }
+    } else if (crit) {
+      this.topHud.setState(ENEMY_STATE.STUN);
+    } else {
+      this.topHud.setState(ENEMY_STATE.HURT);
+    }
     // Blade sweep across the enemy avatar — the player's hit lands (DESIGN §5.8).
     playSlash(this, this.topHud.avatarX, this.topHud.avatarY, {
       accent: crit ? COLORS.amber : COLORS.cyan,
@@ -499,6 +520,7 @@ export class LevelScene extends Phaser.Scene {
   }
 
   onHeroDamaged(amount) {
+    this.topHud.setState(ENEMY_STATE.ATTACK);
     // Blade sweep across the hero avatar — the enemy's strike lands.
     playSlash(this, this.bottomHud.avatarX, this.bottomHud.avatarY, {
       accent: COLORS.enemy,
@@ -572,6 +594,7 @@ export class LevelScene extends Phaser.Scene {
    * spared — so the feedback is a warm golden ring, not a full pardon.
    */
   showShielded() {
+    this.topHud.setState(ENEMY_STATE.DEFENSE, 800);
     const b = this.stageBounds;
     const x = b.x + b.width / 2, y = b.y + b.height * 0.6;
     const ring = this.add.circle(x, y, 26, 0x000000, 0)
@@ -603,6 +626,7 @@ export class LevelScene extends Phaser.Scene {
         else this.scene.start('Upgrade', { run: this.run });
       });
     } else {
+      this.topHud.setState(ENEMY_STATE.VICTORY);
       this.bottomHud.flashHurt();
       this.showBanner('YOU FELL', 0xff4d6d);
       music.sfx('death');
@@ -628,6 +652,10 @@ export class LevelScene extends Phaser.Scene {
     this.conductor.update();
     this.minigame.update();
     this.topHud.update();
+
+    if (this.enemy.shieldPhrases <= 0 && this.topHud.state === ENEMY_STATE.DEFENSE) {
+      this.topHud.setState(ENEMY_STATE.IDLE);
+    }
 
     // Half Time expires on a timer, not on a phrase boundary, so the speed has
     // to be recomputed the moment it lapses — otherwise the notes stay slow for
